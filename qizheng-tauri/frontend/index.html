@@ -122,8 +122,9 @@
                 <div class="field">
                   <label for="timeMode">时间规则</label>
                   <select id="timeMode">
-                    <option value="manual">手填 UTC 偏移</option>
+                    <option value="china">中国北京时间（自动）</option>
                     <option value="region">地区历史时区</option>
+                    <option value="manual">手填 UTC 偏移</option>
                   </select>
                 </div>
                 <div class="field" id="zoneField" hidden>
@@ -267,7 +268,7 @@
       </main>
       <footer class="app-footer">
         <span>人生规划 · 七政四余工作区</span
-        ><span>本地工作区 <i></i> <span id="version">0.5.3</span></span>
+        ><span>本地工作区 <i></i> <span id="version">0.5.4</span></span>
       </footer>
     </div>
     <dialog
@@ -335,6 +336,7 @@
       <section class="setting-section">
         <h3>基础资料版本</h3>
         <p id="dataVersions">正在读取基础资料版本</p>
+        <p>中国北京时间模式自动核对 1986—1991 年夏令时。生效时采用 UTC+9，并提示自动校正 1 小时。请填写当时钟表时间，交接时刻会校验跳时或回拨。</p>
         <p>地区时区支持 1800—2100 年。未来规则按当前已公布政策展开。回拨重时需选择对应的一次，跳时会提示核对。</p>
         <p>内置程序的磁偏使用 WMM2005、2010、2015v2、2020、2025，按年代选择，覆盖 2005—2029 年。WMM2025 适用 2025—2029 年。</p>
       </section>

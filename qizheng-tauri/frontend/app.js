@@ -96,7 +96,7 @@ function currentInput() {
 function timeMetadata() {
   return {
     timeMode: $("#timeMode").value,
-    zoneId: $("#zoneId").value.trim(),
+    zoneId: $("#timeMode").value === "china" ? "Asia/Shanghai" : $("#zoneId").value.trim(),
     fold: Number($("#timeFold").value || -1),
     requestId: state.timeRequest,
   };
@@ -108,28 +108,37 @@ function refreshTime(clearFold = true) {
     $("#timeFold").replaceChildren();
     $("#foldField").hidden = true;
   }
-  const regional = $("#timeMode").value === "region";
-  $("#zoneField").hidden = !regional;
-  $("#offset").readOnly = regional;
-  if (!regional) {
+  const mode = $("#timeMode").value;
+  const automatic = mode !== "manual";
+  $("#zoneField").hidden = mode !== "region";
+  $("#offset").readOnly = automatic;
+  if (!automatic) {
     $("#foldField").hidden = true;
-    $("#timeStatus").textContent = "手填偏移需包含出生时采用的夏令时。";
+    $("#timeStatus").textContent = "手填为最终 UTC 偏移，需含夏令时，不再自动加时。";
     $("#timeStatus").className = "time-status";
     return;
   }
   $("#offset").value = "";
+  const fields = currentInput();
+  if (fields.slice(2, 7).some((value) => !value)) {
+    $("#timeStatus").textContent = mode === "china"
+      ? "中国北京时间 · 填写出生日期与时间后，自动核对 1986—1991 年夏令时。"
+      : "填写出生日期、时间和地区时区后自动核对。";
+    $("#timeStatus").className = "time-status";
+    return;
+  }
   $("#timeStatus").textContent = "正在核对出生地时间…";
-  send("resolveTime", { fields: currentInput(), ...timeMetadata() });
+  send("resolveTime", { fields, ...timeMetadata() });
 }
 
 function showTimeResolution(message) {
-  if (message.requestId !== state.timeRequest || $("#timeMode").value !== "region") return;
+  if (message.requestId !== state.timeRequest || $("#timeMode").value === "manual") return;
   const regional = message.status === "ok";
   $("#offset").value = regional ? message.offset : "";
   $("#timeStatus").textContent = regional
-    ? `${message.label} · IANA ${message.version}`
+    ? message.notice || `${message.label} · IANA ${message.version}`
     : message.message;
-  $("#timeStatus").className = `time-status ${regional ? "resolved" : "time-warning"}`;
+  $("#timeStatus").className = `time-status ${regional && !message.chinaDst ? "resolved" : "time-warning"}`;
   const showFold = message.candidates.length > 1;
   $("#foldField").hidden = !showFold;
   $("#timeFold").replaceChildren(new Option("请选择对应的一次", "-1"));
@@ -147,10 +156,9 @@ function showTimeResolution(message) {
   }
 }
 
-function applyInput(fields) {
-  $("#timeMode").value = "manual";
+function applyInput(fields, preserveOffset = true) {
+  $("#timeMode").value = preserveOffset ? "manual" : "china";
   $("#zoneId").value = "";
-  refreshTime();
   $("#name").value = fields[0];
   state.sex = fields[1];
   $("#date").value =
@@ -160,6 +168,7 @@ function applyInput(fields) {
   $("#longitude").value = fields[7];
   $("#latitude").value = fields[8];
   $("#offset").value = fields[9];
+  refreshTime();
   updateGender();
   invalidate("已载入出生资料", "确认时间和地点后，点击“生成命盘”。");
 }
@@ -695,7 +704,7 @@ $("#example").addEventListener("click", () => {
     "116.383333",
     "39.9",
     "8",
-  ]);
+  ], false);
   showToast("已填写合成示例，可点击生成查看。");
 });
 $("#openCities").addEventListener("click", () => {
@@ -843,6 +852,88 @@ async function runInterfaceTest() {
     assert($("#settingsDialog").open && $("#settingsTitle").textContent === "关于人生规划", "关于窗口未更新");
     $("#settingsDialog").close();
     checks.aboutDialog = true;
+    assert($("#timeMode").value === "china", "新建资料未默认使用中国北京时间自动模式");
+    let exampleTime = waitFor("timezone", (message) => message.requestId === state.timeRequest && message.status === "ok");
+    $("#example").click();
+    await exampleTime;
+    assert($("#timeMode").value === "china" && $("#offset").readOnly, "示例未接入自动时区");
+    const chinaTransitions = [
+      [1986, "05-04", "09-14"],
+      [1987, "04-12", "09-13"],
+      [1988, "04-17", "09-11"],
+      [1989, "04-16", "09-17"],
+      [1990, "04-15", "09-16"],
+      [1991, "04-14", "09-15"],
+    ];
+    let chinaCases = 0;
+    for (const [year, start, end] of chinaTransitions) {
+      const cases = [
+        [start, "01:59", "ok", "8"],
+        [start, "02:00", "nonexistent"],
+        [start, "02:59", "nonexistent"],
+        [start, "03:00", "ok", "9"],
+        [end, "00:59", "ok", "9"],
+        [end, "01:00", "ambiguous"],
+        [end, "01:59", "ambiguous"],
+        [end, "02:00", "ok", "8"],
+        ["07-01", "12:00", "ok", "9"],
+        ["01-01", "12:00", "ok", "8"],
+      ];
+      for (const [day, time, status, offset] of cases) {
+        $("#date").value = `${year}-${day}`;
+        $("#time").value = time;
+        const resolution = waitFor("timezone", (message) => message.requestId === state.timeRequest);
+        refreshTime();
+        const resolved = await resolution;
+        assert(resolved.status === status, `${year}-${day} ${time} 中国夏令时交接判断错误`);
+        if (offset !== undefined) {
+          assert(resolved.offset === offset && $("#offset").value === offset, "中国北京时间偏移错误");
+          assert(resolved.chinaDst === (offset === "9"), "夏令时提示状态错误");
+        }
+        if (status === "ambiguous") {
+          assert(resolved.candidates.map((candidate) => candidate.offset).join(",") === "9,8", "中国回拨候选时间错误");
+        }
+        ++chinaCases;
+      }
+      $("#date").value = `${year}-${end}`;
+      $("#time").value = "01:30";
+      let repeated = waitFor("timezone", (message) => message.requestId === state.timeRequest && message.status === "ambiguous");
+      refreshTime();
+      await repeated;
+      checkInputPage("china_fold");
+      for (const fold of [0, 1]) {
+        $("#timeFold").value = String(fold);
+        repeated = waitFor("timezone", (message) => message.requestId === state.timeRequest && message.status === "ok");
+        refreshTime(false);
+        const resolved = await repeated;
+        assert(resolved.offset === (fold === 0 ? "9" : "8"), "中国回拨时刻选择错误");
+        ++chinaCases;
+      }
+    }
+    checks.chinaDSTBoundaryCases = chinaCases;
+    $("#date").value = "1988/07/01";
+    $("#time").value = "12:00";
+    exampleTime = waitFor("timezone", (message) => message.requestId === state.timeRequest && message.status === "ok");
+    refreshTime();
+    await exampleTime;
+    assert($("#timeStatus").textContent.includes("中国夏令时") && $("#timeStatus").textContent.includes("1小时"), "未明确提示中国夏令时校正");
+    checkInputPage("china_summer_notice");
+    $("#offset").value = "8";
+    const autoCalculation = waitFor("result");
+    $("#generate").click();
+    const autoResult = await autoCalculation;
+    assert(autoResult.fields[9] === "9", "排盘未重新计算中国夏令时偏移");
+    assert(autoResult.sections[0].includes("中国夏令时，已自动校正1小时"), "命盘文本缺少中国夏令时提示");
+    applyInput(autoResult.fields);
+    assert($("#timeMode").value === "manual" && $("#offset").value === "9", "已有夏令时偏移未按旧档案方式载入");
+    const manualCalculation = waitFor("result");
+    $("#generate").click();
+    const manualResult = await manualCalculation;
+    assert(manualResult.fields[9] === "9", "旧档案夏令时被重复叠加");
+    const bodyOf = (text) => text.split(/\r?\n\r?\n/).slice(1).join("\n\n");
+    assert(bodyOf(autoResult.sections[0]) === bodyOf(manualResult.sections[0]), "自动与手填最终偏移排盘不一致");
+    checks.chinaAutomaticCalculationAndNotice = true;
+    checks.legacySummerOffsetCompatibility = true;
     checks.bundledEngine = true;
     applyInput([
       "合成资料 · 北京",

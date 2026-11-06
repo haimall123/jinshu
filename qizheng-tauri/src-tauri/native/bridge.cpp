@@ -70,7 +70,7 @@ static Json profilesJson() {
 
 static void sendState() {
     notify({
-        {"event", "state"}, {"version", "0.5.3"},
+        {"event", "state"}, {"version", "0.5.4"},
         {"engineReady", engineAvailable(app.engine)},
         {"enginePath", utf8(app.engine)},
         {"engineBundled", true},
@@ -262,8 +262,9 @@ static void importProfiles() {
 // Always resolve again on calculate/save. A displayed preview cannot authorize a
 // different date, zone, or repeated-time choice in the native calculation.
 static bool resolveInputTime(const Json& message, Input& input, std::wstring& source) {
-    if (message.value("timeMode", std::string("manual")) != "region") return true;
-    const auto zone = message.value("zoneId", std::string());
+    const auto mode = message.value("timeMode", std::string("manual"));
+    if (mode != "region" && mode != "china") return true;
+    const auto zone = mode == "china" ? std::string("Asia/Shanghai") : message.value("zoneId", std::string());
     const int fold = message.value("fold", -1);
     const auto resolution = app.updates.resolve(input, zone, fold);
     Json candidates = Json::array();
@@ -284,6 +285,21 @@ static bool resolveInputTime(const Json& message, Input& input, std::wstring& so
         source = L"IANA " + fromUtf8(app.updates.timezoneVersion) + L" · " + fromUtf8(zone);
         if (resolution.candidates.size() > 1)
             source += L" · 第 " + std::to_wstring(resolution.selected + 1) + L" 次";
+        if (app.updates.usesChinaBeijingTime(zone)) {
+            const int year = std::stoi(input.v[2]);
+            const bool chinaPeriod = year >= 1986 && year <= 1991;
+            const bool daylight = chinaPeriod && selected.offsetSeconds == 9 * 3600;
+            response["chinaDst"] = daylight;
+            if (daylight) {
+                response["notice"] = "中国夏令时 · UTC+09:00，自动校正1小时，请按当时钟表时间填写。";
+                source += L" · 中国夏令时，已自动校正1小时";
+            } else if (chinaPeriod) {
+                response["notice"] = "中国标准时间 · UTC+08:00，该时刻未实行夏令时。";
+                source += L" · 中国标准时间，未实行夏令时";
+            } else {
+                response["notice"] = "中国北京时间 · " + offsetLabel(selected.offsetSeconds) + "，已核对历史时区。";
+            }
+        }
     }
     notify(response);
     if (resolution.status == "ok") return true;

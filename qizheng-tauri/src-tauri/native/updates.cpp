@@ -56,6 +56,12 @@ bool DataUpdates::load(const std::wstring& directory) {
     return timezoneReady&&!cities.empty();
 }
 
+bool DataUpdates::usesChinaBeijingTime(const std::string& zone) const {
+    const auto requested = zones.find(zone);
+    const auto beijing = zones.find("Asia/Shanghai");
+    return requested != zones.end() && beijing != zones.end() && requested->second == beijing->second;
+}
+
 TimeResolution DataUpdates::resolve(const Input& input,const std::string& zone,int fold) const {
     TimeResolution result;
     if(!timezoneReady) {

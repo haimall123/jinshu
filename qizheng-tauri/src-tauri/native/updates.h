@@ -17,6 +17,7 @@ class DataUpdates {
 public:
     bool load(const std::wstring& directory);
     TimeResolution resolve(const Input& input, const std::string& zone, int fold) const;
+    bool usesChinaBeijingTime(const std::string& zone) const;
     std::vector<City> cities;
     std::string timezoneVersion;
     std::string citiesSnapshot;

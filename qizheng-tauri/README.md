@@ -2,6 +2,8 @@
 
 Windows 本地排盘与文字整理工具。界面使用 Tauri 2，排盘与天文计算由 Moira 1.50 的 Java 源码通过 GraalVM 编译为随包本机计算程序；使用时无需另装 Java 或 Moira。程序使用随包城市、历史时区和星历数据，生成的文字可以复制或导出。Windows 需要 Microsoft Edge WebView2 Runtime。
 
+新建资料默认使用“中国北京时间（自动）”，按 IANA 历史规则处理 1986—1991 年夏令时。生效时采用 UTC+9，输入区和命盘文本会提示校正 1 小时。交接时刻校验跳时与回拨。既有档案按已保存的最终 UTC 偏移载入，可切换自动模式重新核对。
+
 输入区以双栏一页显示。地区时区模式会检查历史夏令时、重复时刻和跳时，旧版 `.mprofile` 可从资料库导入。资料默认保存在当前 Windows 用户的本地应用数据目录。
 
 `engine/src` 包含原计算源码及文字计算入口。`Resource.java` 去除了图形字体枚举，`DiagramTip.java` 用标准点类型替换旧界面的 SWT 点类型。`Geomag.java` 包含 WMM 模型年代修正。原项目和星历库的版权与许可见源文件及 `src-tauri/resources/runtime/moira`。

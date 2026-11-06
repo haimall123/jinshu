@@ -1,6 +1,6 @@
 [package]
 name = "jinshu-qizheng"
-version = "0.5.3"
+version = "0.5.4"
 description = "人生规划"
 edition = "2021"
 license = "GPL-2.0-or-later"
