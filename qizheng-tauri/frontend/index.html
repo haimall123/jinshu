@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; frame-src 'none'"
+    />
+    <title>人生规划 · 七政四余</title>
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="tauri-bridge.js"></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <symbol id="i-chart" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 3.5v17M3.5 12h17M6 6l12 12M18 6 6 18" />
+        <circle cx="12" cy="12" r="3.5" />
+      </symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24">
+        <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3Z" />
+        <path d="M3 10h18" />
+      </symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24">
+        <path
+          d="m10 3-1 3-3 1-2 3 2 2v3l3 2 1 4h4l1-4 3-2v-3l2-2-2-3-3-1-1-3Z"
+        />
+        <circle cx="12" cy="12" r="3" />
+      </symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24">
+        <path d="M5 12h14m-5-5 5 5-5 5" />
+      </symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24">
+        <rect x="8" y="8" width="12" height="13" rx="2" />
+        <path d="M16 8V3H3v14h5" />
+      </symbol>
+      <symbol id="i-export" viewBox="0 0 24 24">
+        <path d="M12 3v12m-4-4 4 4 4-4M4 15v6h16v-6" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="m16 16 5 5" />
+      </symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24">
+        <path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" />
+        <circle cx="12" cy="10" r="2.5" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24">
+        <path d="m6 6 12 12M18 6 6 18" />
+      </symbol>
+      <symbol id="i-save" viewBox="0 0 24 24">
+        <path d="M4 3h13l3 3v15H4Z" />
+        <path d="M8 3v6h8V3M8 21v-7h8v7" />
+      </symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24">
+        <path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="m5 12 4 4L19 6" />
+      </symbol>
+    </svg>
+    <div class="application">
+      <header class="topbar">
+        <div class="identity">
+          <div class="brand" aria-hidden="true"><svg><use href="#i-chart" /></svg></div>
+          <div class="wordmark"><strong>人生规划</strong><span>七政四余 <b> / </b> LIFE PLANNER</span></div>
+        </div>
+        <nav class="main-nav" aria-label="主导航">
+          <button class="nav-button active" id="navChart"><svg><use href="#i-chart" /></svg>排盘</button>
+          <button class="nav-button" id="navProfiles"><svg><use href="#i-folder" /></svg>资料</button>
+          <button class="nav-button" id="navSettings"><svg><use href="#i-settings" /></svg>设置</button>
+        </nav>
+        <div class="top-actions">
+          <span class="engine-status" id="engineStatus">正在连接计算组件</span>
+          <button class="button subtle" id="openProfiles"><svg><use href="#i-folder" /></svg>资料库<span class="count" id="profileCount">0</span></button>
+        </div>
+      </header>
+      <main class="workspace">
+        <section class="input-card" aria-label="出生资料">
+          <div class="card-title">
+            <div><span class="eyebrow">01 · BIRTH DETAILS</span><h1>出生资料</h1></div>
+            <button class="text-button" id="reset">新建</button>
+          </div>
+          <form id="birthForm" novalidate>
+            <div class="form-body">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="name">姓名<span class="optional">选填</span></label>
+                  <input id="name" name="name" maxlength="80" autocomplete="off" placeholder="为这份命盘命名" />
+                </div>
+                <div class="field">
+                  <label>性别</label>
+                  <div class="gender-options" role="group" aria-label="性别">
+                    <button type="button" class="gender selected" data-sex="1" aria-pressed="true">男</button>
+                    <button type="button" class="gender" data-sex="0" aria-pressed="false">女</button>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="date">公历出生日期</label>
+                  <input type="text" id="date" placeholder="YYYY/MM/DD" inputmode="numeric" maxlength="10" autocomplete="off" spellcheck="false" aria-label="公历出生日期，年四位月两位日两位" title="例如 2000/01/31，支持 1800—2100 年" required />
+                </div>
+                <div class="field">
+                  <label for="time">出生时间</label>
+                  <input type="time" id="time" step="60" required />
+                </div>
+                <button type="button" class="city-picker" id="openCities" aria-label="选择出生城市">
+                  <span class="city-icon"><svg><use href="#i-pin" /></svg></span>
+                  <span class="city-description"><strong id="cityLabel">选择出生城市</strong><small>搜索城市与地区</small></span>
+                  <svg class="city-arrow"><use href="#i-search" /></svg>
+                </button>
+                <div class="field">
+                  <label for="longitude">经度<span class="coordinate-sign">东＋ 西－</span></label>
+                  <div class="unit-input"><input id="longitude" inputmode="decimal" placeholder="116.40" maxlength="24" /><span>°</span></div>
+                </div>
+                <div class="field">
+                  <label for="latitude">纬度<span class="coordinate-sign">北＋ 南－</span></label>
+                  <div class="unit-input"><input id="latitude" inputmode="decimal" placeholder="39.93" maxlength="24" /><span>°</span></div>
+                </div>
+                <div class="field">
+                  <label for="timeMode">时间规则</label>
+                  <select id="timeMode">
+                    <option value="manual">手填 UTC 偏移</option>
+                    <option value="region">地区历史时区</option>
+                  </select>
+                </div>
+                <div class="field" id="zoneField" hidden>
+                  <label for="zoneId">地区时区</label>
+                  <input id="zoneId" placeholder="Asia/Shanghai" maxlength="100" spellcheck="false" />
+                </div>
+                <div class="field">
+                  <label for="offset">UTC 偏移</label>
+                  <div class="unit-input"><span class="prefix">UTC</span><input id="offset" inputmode="decimal" value="8" maxlength="24" /><span>小时</span></div>
+                </div>
+                <div id="foldField" class="field" hidden>
+                  <label for="timeFold">回拨时刻</label>
+                  <select id="timeFold" aria-label="选择回拨时刻对应的一次"></select>
+                </div>
+              </div>
+              <div class="form-feedback">
+                <p class="form-error" id="formError" role="alert" hidden></p>
+                <p id="timeStatus" class="time-status" role="status" aria-live="polite"></p>
+              </div>
+            </div>
+            <div class="form-footer">
+              <button class="button primary generate" id="generate" type="submit"><span id="generateLabel">生成命盘</span><svg id="generateIcon"><use href="#i-arrow" /></svg></button>
+              <button class="button save-button" id="save" type="button"><svg><use href="#i-save" /></svg>保存资料</button>
+              <span class="shortcut">Ctrl + Enter 生成 · Ctrl + S 保存</span>
+            </div>
+          </form>
+        </section>
+        <section class="reader" aria-label="命盘阅读">
+          <div class="reader-header">
+            <div class="reader-heading"><span class="eyebrow">02 · CHART &amp; INSIGHTS</span><h2 id="readerTitle">命盘阅读</h2></div>
+            <div class="reader-actions">
+              <button class="button" id="export" disabled>
+                <svg><use href="#i-export" /></svg>导出</button
+              ><button class="button copy-button" id="copy" disabled>
+                <svg><use href="#i-copy" /></svg><span>复制全文</span>
+              </button>
+            </div>
+          </div>
+          <div class="reader-toolbar">
+            <div class="tabs" role="tablist" aria-label="命盘文字页">
+              <button
+                class="tab active"
+                data-section="0"
+                role="tab"
+                aria-selected="true"
+              >
+                完整命盘</button
+              ><button
+                class="tab"
+                data-section="1"
+                role="tab"
+                aria-selected="false"
+              >
+                七政四余</button
+              ><button
+                class="tab"
+                data-section="2"
+                role="tab"
+                aria-selected="false"
+              >
+                四柱八字
+              </button>
+            </div>
+            <div class="view-tools">
+              <button
+                class="icon-button"
+                id="findToggle"
+                title="查找 · Ctrl+F"
+                aria-label="查找文字"
+              >
+                <svg><use href="#i-search" /></svg>
+              </button>
+              <div class="view-switch">
+                <button id="readingMode" class="selected">阅读</button
+                ><button id="rawMode">原文</button>
+              </div>
+            </div>
+          </div>
+          <div class="find-bar" id="findBar" hidden>
+            <input id="findInput" placeholder="查找星曜、宫位或关键词" /><button
+              class="button"
+              id="findNext"
+            >
+              下一个</button
+            ><button class="icon-button" id="findClose" aria-label="关闭查找">
+              <svg><use href="#i-close" /></svg>
+            </button>
+          </div>
+          <div class="reader-scroll" id="readerScroll">
+            <div class="empty-state" id="emptyState">
+              <div class="orbit-art" aria-hidden="true">
+                <svg viewBox="0 0 280 240">
+                  <circle class="astrolabe-rim" cx="140" cy="120" r="112" />
+                  <circle class="astrolabe-rim" cx="140" cy="120" r="96" />
+                  <g class="astrolabe-ticks"><path d="M140.00 20.00L140.00 10.00" /><path d="M150.87 16.57L151.50 10.60" /><path d="M161.62 18.27L162.87 12.40" /><path d="M172.14 21.09L173.99 15.38" /><path d="M182.30 24.99L184.74 19.51" /><path d="M190.00 33.40L195.00 24.74" /><path d="M201.13 35.86L204.66 31.01" /><path d="M209.59 42.71L213.60 38.25" /><path d="M217.29 50.41L221.75 46.40" /><path d="M224.14 58.87L228.99 55.34" /><path d="M226.60 70.00L235.26 65.00" /><path d="M235.01 77.70L240.49 75.26" /><path d="M238.91 87.86L244.62 86.01" /><path d="M241.73 98.38L247.60 97.13" /><path d="M243.43 109.13L249.40 108.50" /><path d="M240.00 120.00L250.00 120.00" /><path d="M243.43 130.87L249.40 131.50" /><path d="M241.73 141.62L247.60 142.87" /><path d="M238.91 152.14L244.62 153.99" /><path d="M235.01 162.30L240.49 164.74" /><path d="M226.60 170.00L235.26 175.00" /><path d="M224.14 181.13L228.99 184.66" /><path d="M217.29 189.59L221.75 193.60" /><path d="M209.59 197.29L213.60 201.75" /><path d="M201.13 204.14L204.66 208.99" /><path d="M190.00 206.60L195.00 215.26" /><path d="M182.30 215.01L184.74 220.49" /><path d="M172.14 218.91L173.99 224.62" /><path d="M161.62 221.73L162.87 227.60" /><path d="M150.87 223.43L151.50 229.40" /><path d="M140.00 220.00L140.00 230.00" /><path d="M129.13 223.43L128.50 229.40" /><path d="M118.38 221.73L117.13 227.60" /><path d="M107.86 218.91L106.01 224.62" /><path d="M97.70 215.01L95.26 220.49" /><path d="M90.00 206.60L85.00 215.26" /><path d="M78.87 204.14L75.34 208.99" /><path d="M70.41 197.29L66.40 201.75" /><path d="M62.71 189.59L58.25 193.60" /><path d="M55.86 181.13L51.01 184.66" /><path d="M53.40 170.00L44.74 175.00" /><path d="M44.99 162.30L39.51 164.74" /><path d="M41.09 152.14L35.38 153.99" /><path d="M38.27 141.62L32.40 142.87" /><path d="M36.57 130.87L30.60 131.50" /><path d="M40.00 120.00L30.00 120.00" /><path d="M36.57 109.13L30.60 108.50" /><path d="M38.27 98.38L32.40 97.13" /><path d="M41.09 87.86L35.38 86.01" /><path d="M44.99 77.70L39.51 75.26" /><path d="M53.40 70.00L44.74 65.00" /><path d="M55.86 58.87L51.01 55.34" /><path d="M62.71 50.41L58.25 46.40" /><path d="M70.41 42.71L66.40 38.25" /><path d="M78.87 35.86L75.34 31.01" /><path d="M90.00 33.40L85.00 24.74" /><path d="M97.70 24.99L95.26 19.51" /><path d="M107.86 21.09L106.01 15.38" /><path d="M118.38 18.27L117.13 12.40" /><path d="M129.13 16.57L128.50 10.60" /></g>
+                  <circle cx="140" cy="120" r="76" stroke-dasharray="2 7" />
+                  <g class="orbit-sweep">
+                    <ellipse cx="140" cy="120" rx="83" ry="38" transform="rotate(-32 140 120)" />
+                    <ellipse cx="140" cy="120" rx="38" ry="83" transform="rotate(-32 140 120)" />
+                    <circle class="satellite" cx="210" cy="73" r="6" />
+                    <circle class="orbit-dot" cx="70" cy="165" r="3" />
+                  </g>
+                  <path class="celestial-cross" d="M140 25v23m0 144v23M45 120h23m144 0h23" />
+                  <path class="celestial-cross" d="M140 71l14 35 35 14-35 14-14 35-14-35-35-14 35-14Z" />
+                  <circle class="orbit-core" cx="140" cy="120" r="23" />
+                  <circle class="astrolabe-rim" cx="140" cy="120" r="8" />
+                  <circle class="orbit-dot" cx="93" cy="62" r="2" />
+                  <circle class="orbit-dot" cx="194" cy="172" r="2" />
+                </svg>
+              </div>
+              <span class="empty-kicker">七政经天 · 四余纬地</span>
+              <h3 id="emptyTitle">从出生资料开始</h3>
+              <p id="emptyDescription">
+                填写左侧资料，生成命盘文字。<br />阅读星曜与四柱，也能复制给大模型解析。
+              </p>
+              <button class="text-button example-button" id="example">
+                填入合成示例 <span>↗</span>
+              </button>
+              <div class="empty-features">
+                <span>本地资料</span><b>·</b><span>分区阅读</span><b>·</b
+                ><span>完整文本</span>
+              </div>
+            </div>
+            <div id="chartView" hidden>
+              <div class="chart-summary" id="chartSummary"></div>
+              <div id="reportContent" class="report-content"></div>
+            </div>
+          </div>
+          <footer class="reader-footer">
+            <span id="resultStatus"><i class="status-dot"></i>等待生成</span>
+            <div class="reading-controls">
+              <button id="fontDown" title="减小字号" aria-label="减小字号">
+                A−</button
+              ><span id="fontValue">15</span
+              ><button id="fontUp" title="增大字号" aria-label="增大字号">
+                A+</button
+              ><i></i><button id="wrap">自动折行</button>
+            </div>
+          </footer>
+        </section>
+      </main>
+      <footer class="app-footer">
+        <span>人生规划 · 七政四余工作区</span
+        ><span>本地工作区 <i></i> <span id="version">0.5.2</span></span>
+      </footer>
+    </div>
+    <dialog
+      id="cityDialog"
+      class="modal city-modal"
+      aria-labelledby="cityTitle"
+    >
+      <header class="modal-header">
+        <div><h2 id="cityTitle">选择出生城市</h2></div>
+        <button class="icon-button close-dialog" aria-label="关闭">
+          <svg><use href="#i-close" /></svg>
+        </button>
+      </header>
+      <div class="search-field">
+        <svg><use href="#i-search" /></svg
+        ><input
+          id="citySearch"
+          placeholder="搜索城市、地区或英文名称"
+          autocomplete="off"
+        />
+      </div>
+      <p class="modal-caption" id="cityCount">输入名称，查找 GeoNames 城市坐标</p>
+      <div id="cityResults" class="city-results"></div>
+      <footer class="modal-note">
+        选择城市后填写坐标和地区时区，按出生日期核对历史夏令时。坐标为城市中心，可按实际出生地点修改。
+      </footer>
+    </dialog>
+    <dialog id="profilesDialog" class="drawer" aria-labelledby="profilesTitle">
+      <header class="modal-header">
+        <div><h2 id="profilesTitle">出生资料库</h2></div>
+        <button class="icon-button close-dialog" aria-label="关闭">
+          <svg><use href="#i-close" /></svg>
+        </button>
+      </header>
+      <div class="drawer-toolbar">
+        <div class="search-field">
+          <svg><use href="#i-search" /></svg
+          ><input id="profileSearch" placeholder="搜索姓名或日期" />
+        </div>
+        <button class="button" id="importProfiles">导入</button>
+      </div>
+      <div class="profiles-list" id="profilesList"></div>
+      <footer class="drawer-footer">
+        <button class="text-button" id="openProfileFolder">
+          打开资料文件夹 ↗</button
+        ><span>每次保存新增一份资料，原有记录保留。</span>
+      </footer>
+    </dialog>
+    <dialog
+      id="settingsDialog"
+      class="modal settings-modal"
+      aria-labelledby="settingsTitle"
+    >
+      <header class="modal-header">
+        <div><h2 id="settingsTitle">工作区设置</h2></div>
+        <button class="icon-button close-dialog" aria-label="关闭">
+          <svg><use href="#i-close" /></svg>
+        </button>
+      </header>
+      <section class="setting-section">
+        <h3>内置计算</h3>
+        <p id="builtInStatus">正在检查内置计算文件</p>
+        <p>城市、历史时区和星历资料随程序提供，填写出生资料即可排盘。</p>
+      </section>
+      <section class="setting-section">
+        <h3>基础资料版本</h3>
+        <p id="dataVersions">正在读取基础资料版本</p>
+        <p>地区时区支持 1800—2100 年。未来规则按当前已公布政策展开。回拨重时需选择对应的一次，跳时会提示核对。</p>
+        <p>内置程序的磁偏使用 WMM2005、2010、2015v2、2020、2025，按年代选择，覆盖 2005—2029 年。WMM2025 适用 2025—2029 年。</p>
+      </section>
+      <section class="setting-section">
+        <h3>本地资料</h3>
+        <p>
+          出生资料保存在当前 Windows 用户的本地应用数据目录。移除的记录保留在资料目录的 trash 中，旧版 .mprofile 资料可从资料库导入。
+        </p>
+      </section>
+    </dialog>
+    <div class="toast-stack" id="toasts" aria-live="polite"></div>
+  </body>
+</html>

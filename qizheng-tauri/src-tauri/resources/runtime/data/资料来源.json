@@ -1,0 +1,85 @@
+{
+  "retrieved": "2026-11-05",
+  "iana": "2026f",
+  "tzdata_python_package": "2026.6",
+  "geonames": "cities15000 daily snapshot",
+  "city_count": 34204,
+  "timezone_count": 598,
+  "wmm_models": [
+    2005,
+    2010,
+    "2015v2",
+    2020,
+    2025
+  ],
+  "wmm2025_valid_years": [
+    2025,
+    2029
+  ],
+  "sources": {
+    "tzdata-latest.tar.gz": {
+      "url": "https://data.iana.org/time-zones/tzdata-latest.tar.gz",
+      "sha256": "01b4a91cec5167ed48c11e8ab78f2048cead78ce94b0cafcad0ae8c5a3044d3d",
+      "bytes": 483310
+    },
+    "cities15000.zip": {
+      "url": "https://download.geonames.org/export/dump/cities15000.zip",
+      "sha256": "6e5bb17e2c265df549ca7d8cae1762d8cf4ce04a9edca9426c2cdbf378b42c0e",
+      "bytes": 3366174
+    },
+    "admin1CodesASCII.txt": {
+      "url": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+      "sha256": "2e4867f5397acb056ea26377601b57af37cb4c81399770225018e9e439e91ad3",
+      "bytes": 151571
+    },
+    "countryInfo.txt": {
+      "url": "https://download.geonames.org/export/dump/countryInfo.txt",
+      "sha256": "79f8f59ea01cbb40438bf1856dd6c2ff201f03f8fc72d0530b2646aaf603ef04",
+      "bytes": 32112
+    },
+    "geonames-readme.txt": {
+      "url": "https://download.geonames.org/export/dump/readme.txt",
+      "sha256": "b1957379b6c1242c700c98ac9a8aa0a09f56c3c0a50ee72175527005f48ef2c5",
+      "bytes": 8843
+    },
+    "WMM2025_TEST_VALUES.txt": {
+      "url": "https://www.ncei.noaa.gov/sites/default/files/2025-02/WMM2025_TEST_VALUES.txt",
+      "sha256": "ae289c94e2200e4deeae2dfdedf543a8a0e93096512b30d6a754199731f570d0",
+      "bytes": 2652
+    },
+    "ecj.jar": {
+      "url": "https://repo.maven.apache.org/maven2/org/eclipse/jdt/core/compiler/ecj/4.4.2/ecj-4.4.2.jar",
+      "sha256": "2d6ee21554bbba012b6b0383be6e6587fa35370104e41c10a3eb47039fa3e6d1",
+      "bytes": 2310271
+    },
+    "webview2.nupkg": {
+      "url": "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.4314.35",
+      "sha256": "90778deb1b77e36292828b4b5833c9255c27533f40e0ddd55891ae718944edc4",
+      "bytes": 9818548
+    },
+    "tzdata.whl": {
+      "url": "https://files.pythonhosted.org/packages/0a/66/9a06c2227fedfd4919f0eaaa8b94377d9730882a7e4f95823c9a331ab5e1/tzdata-2026.6-py2.py3-none-any.whl",
+      "sha256": "0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec",
+      "bytes": 348210
+    }
+  },
+  "wmm_sources": {
+    "WMM2025COF.zip": {
+      "url": "https://www.ncei.noaa.gov/sites/default/files/2024-12/WMM2025COF.zip",
+      "sha256": "2e76569370d081f2cd7919490218bd094ca9afde347b198eff5621e0af460d03",
+      "bytes": 42887
+    },
+    "WMM2020COF.zip": {
+      "url": "https://www.ngdc.noaa.gov/geomag/WMM/data/WMM2020/WMM2020COF.zip",
+      "sha256": "5d2c22447b0fde0a83ee2612c0292c09a21ec0dd332350af5a2ddc71e015c720",
+      "bytes": 30037424
+    },
+    "WMM2015v2COF.zip": {
+      "url": "https://www.ngdc.noaa.gov/geomag/WMM/data/WMM2015/WMM2015v2COF.zip",
+      "sha256": "dd98390299f83243ac6b28b29a7aea6f3502501265c69dda29e4dc067ffd9e33",
+      "bytes": 78586
+    }
+  },
+  "display_labels": "Some country and Chinese province labels are application translations. GeoNames IDs, coordinates and source modification dates are retained.",
+  "future_timezone_rules": "Expanded from the current published rules. Future policy changes require a data update."
+}

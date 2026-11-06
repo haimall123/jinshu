@@ -1,0 +1,12 @@
+{
+  "name": "jinshu-qizheng",
+  "version": "0.5.2",
+  "private": true,
+  "scripts": {
+    "build": "tauri build",
+    "build:portable": "tauri build --no-bundle"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4"
+  }
+}

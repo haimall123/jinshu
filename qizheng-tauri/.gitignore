@@ -1,0 +1,12 @@
+/node_modules/
+/target/
+/src-tauri/target/
+/src-tauri/resources/runtime/bin/*
+!/src-tauri/resources/runtime/bin/.gitkeep
+/src-tauri/resources/runtime/licenses/graalvm/
+/work/
+*.mprofile
+userinfo/
+webview-data/
+settings.ini
+/src-tauri/gen/

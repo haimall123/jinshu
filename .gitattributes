@@ -1,0 +1,2 @@
+qizheng-tauri/src-tauri/resources/runtime/** -text
+.github/workflows/*.yml text eol=lf

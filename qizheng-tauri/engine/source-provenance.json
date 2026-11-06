@@ -1,0 +1,8 @@
+{
+  "source": "https://raw.githubusercontent.com/cyliu12/Moira_Download/main/source.zip",
+  "repository": "cyliu12/Moira_Download",
+  "archive_sha256": "9b51c011b4f23d47a8966dd2b654afc0462ca2094664dc6b495ad4532403fb1a",
+  "entries": 122,
+  "observed_resource_version": "1.50 Final",
+  "note": "Original-author source backup mirrored by a third party. The embedded native engine is rebuilt from the included sources. Synthetic reference outputs were verified against the installed Moira 1.50 binary."
+}
