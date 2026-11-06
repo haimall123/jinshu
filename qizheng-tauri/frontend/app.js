@@ -838,6 +838,11 @@ async function runInterfaceTest() {
     assert(document.title === "人生规划 · 七政四余", "程序名称未更新");
     assert(!$("#navOriginal") && !$("#openOriginal") && !$("#chooseEngine") && !$("#useBundledEngine"), "界面仍有外部程序入口");
     checks.builtInOnly = true;
+    assert($("#navSettings").textContent.trim() === "关于", "导航名称未更新");
+    $("#navSettings").click();
+    assert($("#settingsDialog").open && $("#settingsTitle").textContent === "关于人生规划", "关于窗口未更新");
+    $("#settingsDialog").close();
+    checks.aboutDialog = true;
     checks.bundledEngine = true;
     applyInput([
       "合成资料 · 北京",
@@ -978,6 +983,8 @@ async function runInterfaceTest() {
       "排盘数据缺失",
     );
     checks.calculationThroughUI = true;
+    assert(generated.sections.every((section) => !section.includes("模式: Moira 1.50 默认七政四余")), "命盘文本仍包含已删除的模式行");
+    checks.modeLabelRemoved = true;
     $$(".tab")[2].click();
     pending = waitFor("exported");
     $("#export").click();

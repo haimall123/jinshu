@@ -70,7 +70,7 @@ static Json profilesJson() {
 
 static void sendState() {
     notify({
-        {"event", "state"}, {"version", "0.5.2"},
+        {"event", "state"}, {"version", "0.5.3"},
         {"engineReady", engineAvailable(app.engine)},
         {"enginePath", utf8(app.engine)},
         {"engineBundled", true},
@@ -104,6 +104,11 @@ static void beginCalculation(const Input& input, const std::wstring& timeSource,
     app.resultValid = false;
     std::wstring text;
     bool succeeded = computeChart(input, app.directory, app.engine, text, cancellation);
+    if (succeeded) {
+        const std::wstring modeLine = L"模式: Moira 1.50 默认七政四余\r\n";
+        const auto position = text.find(modeLine);
+        if (position != std::wstring::npos) text.erase(position, modeLine.size());
+    }
     if (succeeded && !timeSource.empty()) {
         const std::wstring previous = L"（请自行确认是否包含夏令时）";
         const auto position = text.find(previous);
