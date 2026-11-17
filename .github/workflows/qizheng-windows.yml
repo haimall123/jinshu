@@ -40,6 +40,8 @@ jobs:
         run: ./engine/build.ps1
       - name: Compare with original sample results
         run: python ./engine/verify.py
+      - name: Verify lunar birthday conversion
+        run: python ./engine/verify-calendar.py
       - name: Install frontend build dependencies
         run: npm ci
       - name: Build portable application

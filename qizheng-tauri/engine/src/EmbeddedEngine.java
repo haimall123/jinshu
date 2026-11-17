@@ -18,6 +18,7 @@ import org.athomeprojects.base.BaseIO;
 import org.athomeprojects.base.BaseTab;
 import org.athomeprojects.base.ChartData;
 import org.athomeprojects.base.ChartMode;
+import org.athomeprojects.base.Calculate;
 import org.athomeprojects.base.City;
 import org.athomeprojects.base.DataEntry;
 import org.athomeprojects.base.DiagramTip;
@@ -57,6 +58,45 @@ public final class EmbeddedEngine {
 
     private static boolean finite(double value) {
         return !Double.isNaN(value) && !Double.isInfinite(value);
+    }
+
+    // Calendar dates use the Chinese calendar's Beijing civil day, independent
+    // of the birth location, clock time and historical daylight-saving offset.
+    private static String convertCalendar(String[] fields, boolean fromLunar, boolean leap) {
+        int year = Integer.parseInt(fields[2]);
+        int month = Integer.parseInt(fields[3]);
+        int day = Integer.parseInt(fields[4]);
+        if (year < 1800 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31)
+            throw new IllegalArgumentException("日期范围为 1800—2100 年，月份 1—12");
+        int[] entered = new int[]{year, month, day, 12, 0};
+        Calculate calculator = new Calculate();
+        calculator.loadResource();
+        int[] solar;
+        int[] lunar;
+        boolean lunarLeap;
+        if (fromLunar) {
+            if (day > 30) throw new IllegalArgumentException("农历日期范围为初一至三十");
+            solar = calculator.getDateFromLunarDate(entered.clone(), leap);
+            if (solar == null) throw new IllegalArgumentException("该农历日期或闰月不存在，请检查月份和日期");
+            lunar = calculator.getLunarDate(solar.clone());
+            lunarLeap = calculator.isLeapMonth();
+            if (lunar == null || lunar[0] != year || lunar[1] != month || lunar[2] != day || lunarLeap != leap)
+                throw new IllegalArgumentException("该农历日期或闰月不存在，请检查月份和日期");
+        } else {
+            GregorianCalendar calendar = new GregorianCalendar();
+            calendar.clear();
+            calendar.setLenient(false);
+            calendar.set(year, month - 1, day, 12, 0);
+            calendar.getTime();
+            solar = entered;
+            lunar = calculator.getLunarDate(solar.clone());
+            lunarLeap = calculator.isLeapMonth();
+            if (lunar == null) throw new IllegalArgumentException("无法换算该公历日期");
+        }
+        if (solar[0] < 1800 || solar[0] > 2100)
+            throw new IllegalArgumentException("换算后的公历超出 1800—2100 年范围");
+        return String.format(Locale.ROOT, "%d %d %d %d %d %d %d", solar[0], solar[1], solar[2],
+                lunar[0], lunar[1], lunar[2], lunarLeap ? 1 : 0);
     }
 
     private static String calculate(String[] fields) {
@@ -108,7 +148,7 @@ public final class EmbeddedEngine {
     public static void main(String[] args) throws Exception {
         PrintStream output = new PrintStream(new FileOutputStream(FileDescriptor.out), true, "UTF-8");
         try {
-            if (args.length != 1) throw new IllegalArgumentException("缺少内置资料目录");
+            if (args.length < 1 || args.length > 2) throw new IllegalArgumentException("缺少内置资料目录");
             Locale.setDefault(Locale.SIMPLIFIED_CHINESE);
             BufferedReader reader = new BufferedReader(new InputStreamReader(System.in, "UTF-8"));
             String root = "--stdin-path".equals(args[0]) ? reader.readLine() : args[0];
@@ -123,7 +163,14 @@ public final class EmbeddedEngine {
                 fields[i] = reader.readLine();
                 if (fields[i] == null) throw new IllegalArgumentException("出生资料不完整");
             }
-            output.print(calculate(fields));
+            if (args.length == 2) {
+                String mode = args[1];
+                if (!"--lunar".equals(mode) && !"--lunar-leap".equals(mode) && !"--solar".equals(mode))
+                    throw new IllegalArgumentException("历法转换模式无效");
+                output.print(convertCalendar(fields, !"--solar".equals(mode), "--lunar-leap".equals(mode)));
+            } else {
+                output.print(calculate(fields));
+            }
             output.flush();
         } catch (Exception error) {
             if ("1".equals(System.getenv("MOIRA_ENGINE_DEBUG"))) error.printStackTrace(System.err);

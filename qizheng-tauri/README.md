@@ -6,6 +6,10 @@ Windows 本地排盘与文字整理工具。界面使用 Tauri 2，排盘与天�
 
 输入区以双栏一页显示。地区时区模式会检查历史夏令时、重复时刻和跳时，旧版 `.mprofile` 可从资料库导入。资料默认保存在当前 Windows 用户的本地应用数据目录。
 
+出生日期可选择公历或农历。农历按数字年月日填写（例如 `1982/05/20`），闰月点选“闰月”；切换历法会换算并保留同一天。输入区显示对应的公历日期，不存在的日期、大小月及无效闰月会提示核对。先将农历日期转为公历，再处理出生地历史夏令时；出生时分仍按当时钟表填写。农历换算使用内置原计算核心，支持输入年份 1800—2100，换算后的公历也须在该范围。
+
+农历输入来源和对应公历会写入复制／导出文本。档案继续保存换算后的公历和最终 UTC 偏移，载入时按公历显示，以兼容已有档案。本次不更改大运算法、起运年龄和交运年份。
+
 `engine/src` 包含原计算源码及文字计算入口。`Resource.java` 去除了图形字体枚举，`DiagramTip.java` 用标准点类型替换旧界面的 SWT 点类型。`Geomag.java` 包含 WMM 模型年代修正。原项目和星历库的版权与许可见源文件及 `src-tauri/resources/runtime/moira`。
 
 ## 构建
@@ -14,6 +18,7 @@ Windows 本地排盘与文字整理工具。界面使用 Tauri 2，排盘与天�
 
 1. 在 x64 开发者命令环境设置 `JAVA_HOME` 指向 GraalVM，执行 `powershell -ExecutionPolicy Bypass -File engine/build.ps1`。
 2. 执行 `python engine/verify.py`，以合成资料对照原 Moira 的输出哈希。
+   执行 `python engine/verify-calendar.py`，核对独立农历样本、闰月及无效日期。
 3. 执行 `npm ci` 和 `npm run build:portable`，可执行程序位于 `src-tauri/target/release/jinshu-qizheng.exe`。将它与 `src-tauri/resources/runtime` 文件夹放在同一个目录即可运行。
 
 仓库根目录的 GitHub Actions 工作流执行上述 Windows 云端构建，产物包含“人生规划.exe”和 runtime 文件夹，可从对应运行记录的 Artifacts 下载。

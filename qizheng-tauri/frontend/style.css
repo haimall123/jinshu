@@ -213,6 +213,14 @@ h1 { color: #f2dfb9; font-size: 23px; }
 .field select { font-size: 12px; padding-left: 8px; }
 #date { letter-spacing: .6px; font-family: "Bahnschrift", var(--body-font); }
 #date::placeholder { font-size: 13px; }
+.date-entry { display: flex; gap: 4px; }
+.date-entry #calendarType { flex: 0 0 59px; width: 59px; padding-left: 5px; }
+.date-entry #date { flex: 1; padding: 0 6px; letter-spacing: 0; font-size: 12px; }
+.field #dateHeading.has-lunar { height: 30px; }
+.leap-toggle { margin-left: auto; min-width: 44px; height: 30px; padding: 0 6px; border: 1px solid #4b6e82; border-radius: 6px; color: #b3c9de; font-size: 11px; }
+.leap-toggle[aria-pressed="true"] { color: #b7ffef; background: #204450; border-color: #70c6bd; }
+.calendar-status { margin: 0 0 4px; color: #a1e5d6; font-size: 11px; line-height: 1.5; }
+.calendar-status.invalid { color: #ffb99f; }
 #zoneId, #timeFold { font-size: 12px; }
 input[type="time"] { padding: 0 8px; }
 input::-webkit-calendar-picker-indicator { opacity: .8; cursor: pointer; }

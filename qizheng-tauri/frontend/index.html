@@ -99,8 +99,11 @@
                   </div>
                 </div>
                 <div class="field">
-                  <label for="date">公历出生日期</label>
-                  <input type="text" id="date" placeholder="YYYY/MM/DD" inputmode="numeric" maxlength="10" autocomplete="off" spellcheck="false" aria-label="公历出生日期，年四位月两位日两位" title="例如 2000/01/31，支持 1800—2100 年" required />
+                  <label for="date" id="dateHeading"><span id="dateCaption">公历出生日期</span><button type="button" id="lunarLeap" class="leap-toggle" aria-pressed="false" hidden>闰月</button></label>
+                  <div class="date-entry">
+                    <select id="calendarType" aria-label="出生日期历法"><option value="solar">公历</option><option value="lunar">农历</option></select>
+                    <input type="text" id="date" placeholder="YYYY/MM/DD" inputmode="numeric" maxlength="10" autocomplete="off" spellcheck="false" aria-label="公历出生日期，年四位月两位日两位" title="例如 2000/01/31，支持 1800—2100 年" required />
+                  </div>
                 </div>
                 <div class="field">
                   <label for="time">出生时间</label>
@@ -142,6 +145,7 @@
               </div>
               <div class="form-feedback">
                 <p class="form-error" id="formError" role="alert" hidden></p>
+                <p id="calendarStatus" class="calendar-status" role="status" aria-live="polite" hidden></p>
                 <p id="timeStatus" class="time-status" role="status" aria-live="polite"></p>
               </div>
             </div>

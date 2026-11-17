@@ -19,6 +19,9 @@ const state = {
   cities: [],
   cityRequest: 0,
   timeRequest: 0,
+  calendarMode: "solar",
+  lunarLeap: false,
+  calendarSwitch: null,
   timezoneVersion: "",
   testing: false,
 };
@@ -95,6 +98,8 @@ function currentInput() {
 
 function timeMetadata() {
   return {
+    calendarType: $("#calendarType").value,
+    lunarLeap: state.lunarLeap,
     timeMode: $("#timeMode").value,
     zoneId: $("#timeMode").value === "china" ? "Asia/Shanghai" : $("#zoneId").value.trim(),
     fold: Number($("#timeFold").value || -1),
@@ -102,8 +107,82 @@ function timeMetadata() {
   };
 }
 
+function updateCalendarControls() {
+  const lunar = $("#calendarType").value === "lunar";
+  $("#dateCaption").textContent = lunar ? "农历出生日期" : "公历出生日期";
+  $("#dateHeading").classList.toggle("has-lunar", lunar);
+  $("#lunarLeap").hidden = !lunar;
+  $("#lunarLeap").setAttribute("aria-pressed", String(state.lunarLeap));
+  $("#lunarLeap").textContent = state.lunarLeap ? "✓ 闰月" : "闰月";
+  $("#date").setAttribute("aria-label", `${lunar ? "农历" : "公历"}出生日期，年四位月两位日两位`);
+  $("#date").title = lunar ? "例如 1982/05/20；闰月请选中“闰月”，支持 1800—2100 年，按中国农历换算" : "例如 2000/01/31，支持 1800—2100 年";
+  $("#calendarStatus").hidden = !lunar;
+}
+
+function switchCalendar() {
+  const previous = state.calendarMode;
+  const previousLeap = state.lunarLeap;
+  state.calendarMode = $("#calendarType").value;
+  invalidate();
+  updateCalendarControls();
+  const fields = currentInput();
+  if (fields.slice(2, 5).some((value) => !value)) {
+    state.lunarLeap = false;
+    refreshTime();
+    return;
+  }
+  const requestId = ++state.timeRequest;
+  state.calendarSwitch = { requestId, previous, previousLeap };
+  $("#calendarStatus").hidden = false;
+  $("#calendarStatus").textContent = "正在换算出生日期…";
+  updateButtons();
+  send("convertCalendar", { fields, calendarType: previous, lunarLeap: previousLeap,
+    targetCalendar: state.calendarMode, requestId });
+}
+
+function showCalendarResolution(message) {
+  if (message.requestId !== state.timeRequest) return;
+  const pending = state.calendarSwitch;
+  if (message.switching && pending?.requestId === message.requestId) {
+    state.calendarSwitch = null;
+    if (message.status === "ok") {
+      const lunar = $("#calendarType").value === "lunar";
+      const date = lunar ? message.lunar : message.solar;
+      $("#date").value = `${date[0]}/${date[1].padStart(2, "0")}/${date[2].padStart(2, "0")}`;
+      state.lunarLeap = lunar && message.leap;
+    } else {
+      state.calendarMode = pending.previous;
+      state.lunarLeap = pending.previousLeap;
+      $("#calendarType").value = pending.previous;
+      showToast(message.message, "error");
+    }
+    updateButtons();
+    refreshTime();
+    return;
+  }
+  if ($("#calendarType").value !== "lunar") return;
+  $("#calendarStatus").hidden = false;
+  $("#calendarStatus").className = `calendar-status${message.status === "ok" ? "" : " invalid"}`;
+  $("#calendarStatus").textContent = message.status === "ok" ? message.notice : message.message;
+  if (message.status !== "ok" && $("#timeMode").value !== "manual") {
+    $("#offset").value = "";
+    $("#timeStatus").textContent = "请先核对农历日期，再核对出生时间。";
+    $("#timeStatus").className = "time-status time-warning";
+  }
+}
+
 function refreshTime(clearFold = true) {
   ++state.timeRequest;
+  state.calendarSwitch = null;
+  updateCalendarControls();
+  updateButtons();
+  const lunar = $("#calendarType").value === "lunar";
+  const fields = currentInput();
+  if (lunar) {
+    $("#calendarStatus").className = "calendar-status";
+    $("#calendarStatus").textContent = fields.slice(2, 5).some((value) => !value)
+      ? "填写农历年月日；闰月请点选“闰月”。" : "正在核对农历日期…";
+  }
   if (clearFold) {
     $("#timeFold").replaceChildren();
     $("#foldField").hidden = true;
@@ -116,11 +195,12 @@ function refreshTime(clearFold = true) {
     $("#foldField").hidden = true;
     $("#timeStatus").textContent = "手填为最终 UTC 偏移，需含夏令时，不再自动加时。";
     $("#timeStatus").className = "time-status";
+    if (lunar && fields.slice(2, 5).every(Boolean)) send("resolveDate", { fields, ...timeMetadata() });
     return;
   }
   $("#offset").value = "";
-  const fields = currentInput();
   if (fields.slice(2, 7).some((value) => !value)) {
+    if (lunar && fields.slice(2, 5).every(Boolean)) send("resolveDate", { fields, ...timeMetadata() });
     $("#timeStatus").textContent = mode === "china"
       ? "中国北京时间 · 填写出生日期与时间后，自动核对 1986—1991 年夏令时。"
       : "填写出生日期、时间和地区时区后自动核对。";
@@ -157,6 +237,9 @@ function showTimeResolution(message) {
 }
 
 function applyInput(fields, preserveOffset = true) {
+  state.calendarMode = "solar";
+  state.lunarLeap = false;
+  $("#calendarType").value = "solar";
   $("#timeMode").value = preserveOffset ? "manual" : "china";
   $("#zoneId").value = "";
   $("#name").value = fields[0];
@@ -182,6 +265,7 @@ function updateGender() {
 }
 
 function updateButtons() {
+  $("#generate").disabled = !!state.calendarSwitch;
   $("#copy").disabled = !state.valid || state.busy;
   $("#export").disabled = !state.valid || state.busy;
   $("#generateLabel").textContent = state.busy ? "取消计算" : "生成命盘";
@@ -192,17 +276,18 @@ function updateButtons() {
   $("#copy span").textContent = state.section === 0 ? "复制全文" : "复制本页";
   $("#birthForm").classList.toggle("busy", state.busy);
   $("#birthForm")
-    .querySelectorAll("input, select, .gender, #openCities, #save")
+    .querySelectorAll("input, select, .gender, #openCities, #save, #lunarLeap")
     .forEach((control) => {
-      control.disabled = state.busy;
+      control.disabled = state.busy || !!state.calendarSwitch;
     });
+  $("#save").disabled = state.busy || !!state.calendarSwitch;
   [
     "#reset",
     "#openProfiles",
     "#navProfiles",
     "#navSettings",
   ].forEach((id) => {
-    $(id).disabled = state.busy;
+    $(id).disabled = state.busy || !!state.calendarSwitch;
   });
 }
 
@@ -245,6 +330,8 @@ function invalidate(
 
 function resetInput() {
   $("#birthForm").reset();
+  state.calendarMode = "solar";
+  state.lunarLeap = false;
   refreshTime();
   state.sex = "1";
   updateGender();
@@ -259,6 +346,7 @@ function resetInput() {
 
 function startCalculation(event) {
   if (event) event.preventDefault();
+  if (state.calendarSwitch) return;
   if (state.busy) {
     send("cancel");
     return;
@@ -617,6 +705,9 @@ bridge.addEventListener("message", (event) => {
     case "timezone":
       showTimeResolution(message);
       break;
+    case "calendar":
+      showCalendarResolution(message);
+      break;
     case "busy":
       setBusy(message.value);
       break;
@@ -687,11 +778,17 @@ $$(".gender").forEach((button) =>
   }),
 );
 $("#timeMode").addEventListener("change", () => { invalidate(); refreshTime(); });
+$("#calendarType").addEventListener("change", switchCalendar);
+$("#lunarLeap").addEventListener("click", () => {
+  state.lunarLeap = !state.lunarLeap;
+  invalidate();
+  refreshTime();
+});
 $("#timeFold").addEventListener("change", () => { invalidate(); refreshTime(false); });
 $("#reset").addEventListener("click", resetInput);
-$("#save").addEventListener("click", () =>
-  send("save", { fields: currentInput(), ...timeMetadata() }),
-);
+$("#save").addEventListener("click", () => {
+  if (!state.calendarSwitch) send("save", { fields: currentInput(), ...timeMetadata() });
+});
 $("#example").addEventListener("click", () => {
   applyInput([
     "合成资料",
@@ -1121,7 +1218,100 @@ async function runInterfaceTest() {
     assert(cancelled.message.includes("取消"), "取消计算失败");
     checks.cancelCalculation = true;
 
-    $("#name").value = "合成资料 · 北京";
+    // Calendar conversion is exercised through the same native messages used
+    // for ordinary input, calculation and profile persistence.
+    let calendarTime = waitFor("timezone", (m) => m.requestId === state.timeRequest && m.status === "ok");
+    applyInput(["合成资料 · 农历1982", "1", "1982", "7", "10", "14", "10", "129.5", "42.9", "8"], false);
+    await calendarTime;
+    let calendarChart = waitFor("result");
+    $("#generate").click();
+    const solarChart = await calendarChart;
+    let switched = waitFor("calendar", (m) => m.switching);
+    calendarTime = waitFor("timezone", (m) => m.requestId === state.timeRequest && m.status === "ok");
+    $("#calendarType").value = "lunar";
+    $("#calendarType").dispatchEvent(new Event("change"));
+    assert($("#generate").disabled && $("#save").disabled, "历法切换中未防止误生成或误保存");
+    assert((await switched).status === "ok", "公历转农历失败");
+    await calendarTime;
+    assert($("#date").value === "1982/05/20" && !state.lunarLeap, "1982年五月二十换算错误");
+    assert($("#calendarStatus").textContent.includes("1982/7/10"), "缺少对应公历提示");
+    checkInputPage("lunar_birthday");
+    calendarChart = waitFor("result");
+    $("#generate").click();
+    const lunarChart = await calendarChart;
+    assert(lunarChart.fields.slice(2, 5).join("-") === "1982-7-10", "后台未重新换算农历");
+    assert(lunarChart.sections[0].includes("输入农历: 1982年5月20日"), "复制文本缺少农历输入来源");
+    assert(bodyOf(lunarChart.sections[0]) === bodyOf(solarChart.sections[0]), "同一天公历与农历排盘不一致");
+    assert(/始于:\s*1992\s+2002/.test(lunarChart.sections[2]) && /11岁\s+21岁/.test(lunarChart.sections[2]), "原有大运年份或年龄被更改");
+    checks.lunarSolarChartParity = true;
+    checks.bigCycleUnchanged = true;
+    let lunarSaved = waitFor("saved");
+    $("#save").click();
+    assert((await lunarSaved).ok, "农历生日保存失败");
+    const lunarProfile = state.profiles.find((profile) => profile.name === "合成资料 · 农历1982");
+    assert(lunarProfile.fields.slice(2, 5).join("-") === "1982-7-10", "档案未保存规范公历");
+    let lunarLoaded = waitFor("loadInput");
+    send("loadProfile", { id: lunarProfile.id });
+    await lunarLoaded;
+    assert($("#calendarType").value === "solar" && $("#date").value === "1982/07/10" && $("#offset").value === "8", "农历档案重载后发生重复换算");
+    checks.lunarProfileCompatibility = true;
+
+    calendarTime = waitFor("timezone", (m) => m.requestId === state.timeRequest && m.status === "ok");
+    applyInput(["合成闰月", "0", "2023", "3", "22", "12", "0", "116.4", "39.9", "8"], false);
+    await calendarTime;
+    switched = waitFor("calendar", (m) => m.switching);
+    calendarTime = waitFor("timezone", (m) => m.requestId === state.timeRequest && m.status === "ok");
+    $("#calendarType").value = "lunar";
+    $("#calendarType").dispatchEvent(new Event("change"));
+    await switched;
+    await calendarTime;
+    assert($("#date").value === "2023/02/01" && state.lunarLeap && $("#lunarLeap").getAttribute("aria-pressed") === "true", "闰二月未被识别");
+    checkInputPage("lunar_leap_month");
+    $("#date").value = "2023/02/30";
+    let invalidLunar = waitFor("calendar", (m) => m.requestId === state.timeRequest && m.status === "invalid");
+    refreshTime();
+    await invalidLunar;
+    assert($("#calendarStatus").classList.contains("invalid") && $("#offset").value === "", "无效农历日期未提示或仍保留旧偏移");
+    assert(!$("#timeStatus").textContent.includes("正在"), "无效日期仍显示核对中");
+    let invalidCalculation = waitFor("validationError");
+    $("#generate").click();
+    await invalidCalculation;
+    assert(!state.busy, "无效农历未中止计算");
+    checkInputPage("lunar_invalid_date");
+    checks.lunarLeapAndInvalidDate = true;
+
+    calendarTime = waitFor("timezone", (m) => m.requestId === state.timeRequest && m.status === "ok");
+    applyInput(["合成夏令时", "1", "1988", "7", "1", "12", "0", "116.4", "39.9", "8"], false);
+    await calendarTime;
+    switched = waitFor("calendar", (m) => m.switching);
+    calendarTime = waitFor("timezone", (m) => m.requestId === state.timeRequest && m.status === "ok");
+    $("#calendarType").value = "lunar";
+    $("#calendarType").dispatchEvent(new Event("change"));
+    await switched;
+    await calendarTime;
+    assert($("#offset").value === "9" && $("#timeStatus").textContent.includes("中国夏令时"), "农历未按换算后的公历处理夏令时");
+    checkInputPage("lunar_china_summer");
+    calendarChart = waitFor("result");
+    $("#generate").click();
+    const lunarSummer = await calendarChart;
+    assert(lunarSummer.fields.slice(2, 5).join("-") === "1988-7-1" && lunarSummer.fields[9] === "9", "农历排盘未重新解析夏令时");
+    assert(lunarSummer.sections[0].includes("输入农历:") && lunarSummer.sections[0].includes("中国夏令时，已自动校正1小时"), "农历夏令时文字来源不完整");
+    checks.lunarChinaDST = true;
+
+    calendarTime = waitFor("timezone", (m) => m.requestId === state.timeRequest && m.status === "ambiguous");
+    applyInput(["合成回拨", "1", "1988", "9", "11", "1", "30", "116.4", "39.9", "8"], false);
+    await calendarTime;
+    switched = waitFor("calendar", (m) => m.switching);
+    calendarTime = waitFor("timezone", (m) => m.requestId === state.timeRequest && m.status === "ambiguous");
+    $("#calendarType").value = "lunar";
+    $("#calendarType").dispatchEvent(new Event("change"));
+    await switched;
+    await calendarTime;
+    checkInputPage("lunar_china_fold");
+    assert(!$("#foldField").hidden, "农历未显示回拨选择");
+    checks.lunarChinaFold = true;
+
+    applyInput(["合成资料 · 北京", "1", "2000", "1", "1", "12", "0", "116.4", "39.9", "8"]);
     $("#timeMode").value = "region";
     $("#zoneId").value = "Asia/Shanghai";
     resolved = waitFor("timezone", (message) => message.requestId === state.timeRequest && message.status === "ok");

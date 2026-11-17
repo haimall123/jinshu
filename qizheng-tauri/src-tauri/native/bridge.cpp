@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <sstream>
 #include <vector>
 
 using Json = nlohmann::json;
@@ -70,7 +71,7 @@ static Json profilesJson() {
 
 static void sendState() {
     notify({
-        {"event", "state"}, {"version", "0.5.4"},
+        {"event", "state"}, {"version", "0.5.5"},
         {"engineReady", engineAvailable(app.engine)},
         {"enginePath", utf8(app.engine)},
         {"engineBundled", true},
@@ -89,7 +90,8 @@ static const Profile* profileById(const std::string& identifier) {
     return nullptr;
 }
 
-static void beginCalculation(const Input& input, const std::wstring& timeSource, HANDLE cancellation) {
+static void beginCalculation(const Input& input, const std::wstring& timeSource,
+                             const std::wstring& dateSource, HANDLE cancellation) {
     if (app.busy) return;
     const auto checked = validate(input);
     if (!checked) {
@@ -114,6 +116,10 @@ static void beginCalculation(const Input& input, const std::wstring& timeSource,
         const auto position = text.find(previous);
         if (position != std::wstring::npos)
             text.replace(position, previous.size(), L"（" + timeSource + L"）");
+    }
+    if (succeeded && !dateSource.empty()) {
+        const auto headerEnd = text.find(L"\r\n\r\n");
+        if (headerEnd != std::wstring::npos) text.insert(headerEnd, L"\r\n" + dateSource);
     }
     app.busy = false;
     app.resultValid = succeeded;
@@ -261,6 +267,74 @@ static void importProfiles() {
 
 // Always resolve again on calculate/save. A displayed preview cannot authorize a
 // different date, zone, or repeated-time choice in the native calculation.
+static bool convertInputDate(const Json& message, Input& input, std::wstring& source,
+                             bool force = false) {
+    const auto mode = message.value("calendarType", std::string("solar"));
+    if (mode == "solar" && !force) return true;
+    const bool leap = message.value("lunarLeap", false);
+    std::wstring error;
+    if (mode != "solar" && mode != "lunar") error = L"请选择公历或农历。";
+    if (input.v.size() != 10) error = L"出生日期不完整。";
+    if (error.empty()) {
+        for (int i = 2; i <= 4; ++i) {
+            const auto& field = input.v[i];
+            if (field.empty() || field.size() > 4 || field.find_first_not_of(L"0123456789") != std::wstring::npos) {
+                error = L"请填写完整的出生日期，例如 1982/05/20。";
+                break;
+            }
+        }
+    }
+    std::wstring converted;
+    if (error.empty()) {
+        // The converter only needs the civil date. Keep unvalidated form fields
+        // out of the engine's line-based protocol.
+        Input calendarInput{{L"calendar", L"1", input.v[2], input.v[3], input.v[4],
+                             L"12", L"0", L"116.4", L"39.9", L"8"}};
+        const auto flag = mode == "solar" ? L"--solar" : leap ? L"--lunar-leap" : L"--lunar";
+        if (!computeChart(calendarInput, app.directory, app.engine, converted, nullptr, flag)) {
+            error = converted;
+            const auto prefix = error.find(L": ");
+            if (error.rfind(L"ERROR:", 0) == 0 && prefix != std::wstring::npos) {
+                error = error.substr(prefix + 2);
+                const auto detail = error.find(L": ");
+                if (detail != std::wstring::npos) error = error.substr(detail + 2);
+            }
+        }
+    }
+    Json response{{"event", "calendar"}, {"requestId", message.value("requestId", 0)},
+                  {"switching", force}, {"status", "invalid"}};
+    if (error.empty()) {
+        std::wistringstream stream(converted);
+        int sy = 0, sm = 0, sd = 0, ly = 0, lm = 0, ld = 0, ll = 0;
+        if (!(stream >> sy >> sm >> sd >> ly >> lm >> ld >> ll)) {
+            error = L"历法换算未返回有效日期。";
+        } else if (force && message.value("targetCalendar", std::string()) == "lunar" && ly < 1800) {
+            error = L"该日对应的农历年份早于 1800 年，请保留公历输入。";
+        } else {
+            response["status"] = "ok";
+            response["solar"] = {std::to_string(sy), std::to_string(sm), std::to_string(sd)};
+            response["lunar"] = {std::to_string(ly), std::to_string(lm), std::to_string(ld)};
+            response["leap"] = ll != 0;
+            response["notice"] = "对应公历：" + std::to_string(sy) + "/" + std::to_string(sm) + "/" + std::to_string(sd);
+            if (mode == "lunar") {
+                source = L"输入农历: " + std::to_wstring(ly) + L"年" + (ll ? L"闰" : L"") +
+                    std::to_wstring(lm) + L"月" + std::to_wstring(ld) + L"日；对应公历: " +
+                    std::to_wstring(sy) + L"年" + std::to_wstring(sm) + L"月" + std::to_wstring(sd) + L"日";
+                input.v[2] = std::to_wstring(sy);
+                input.v[3] = std::to_wstring(sm);
+                input.v[4] = std::to_wstring(sd);
+            }
+        }
+    }
+    response["message"] = utf8(error);
+    notify(response);
+    if (error.empty()) return true;
+    const auto action = message.value("action", std::string());
+    if (action == "calculate" || action == "save")
+        notify({{"event", "validationError"}, {"index", 4}, {"message", utf8(error)}});
+    return false;
+}
+
 static bool resolveInputTime(const Json& message, Input& input, std::wstring& source) {
     const auto mode = message.value("timeMode", std::string("manual"));
     if (mode != "region" && mode != "china") return true;
@@ -312,16 +386,19 @@ static void handleMessage(const Json& message, HANDLE cancellation) {
     const auto action = message.value("action", std::string());
     if (action == "ready") { sendState(); return; }
     if (app.busy) return;
-    if (action == "calculate" || action == "resolveTime") {
+    if (action == "calculate" || action == "resolveTime" || action == "resolveDate" || action == "convertCalendar") {
         auto input = inputFromJson(message.at("fields"));
-        std::wstring source;
+        std::wstring source, dateSource;
+        if (!convertInputDate(message, input, dateSource, action == "convertCalendar")) return;
+        if (action == "resolveDate" || action == "convertCalendar") return;
         if (!resolveInputTime(message, input, source)) return;
-        if (action == "calculate") beginCalculation(input, source, cancellation);
+        if (action == "calculate") beginCalculation(input, source, dateSource, cancellation);
     }
     else if (action == "invalidate") { app.resultValid = false; }
     else if (action == "save") {
         auto input = inputFromJson(message.at("fields"));
-        std::wstring source;
+        std::wstring source, dateSource;
+        if (!convertInputDate(message, input, dateSource)) return;
         if (!resolveInputTime(message, input, source)) return;
         auto checked = validate(input);
         if (!checked) {

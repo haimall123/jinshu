@@ -22,7 +22,7 @@ bool readBytes(const std::wstring& p,std::string& data,size_t limit=1024*1024);
 bool writeAtomic(const std::wstring& p,const std::string& data,bool replace=false);
 Check validate(const Input& input);
 bool engineAvailable(const std::wstring& home);
-bool computeChart(const Input& input,const std::wstring& dir,const std::wstring& home,std::wstring& result,HANDLE cancel=nullptr);
+bool computeChart(const Input& input,const std::wstring& dir,const std::wstring& home,std::wstring& result,HANDLE cancel=nullptr,const std::wstring& calendarMode=L"");
 std::vector<City> loadCities(const std::wstring& home);
 std::vector<Profile> loadProfiles(const std::wstring& dir);
 bool saveProfile(const std::wstring& dir,const Input& input,std::wstring& path);

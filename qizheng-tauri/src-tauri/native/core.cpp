@@ -24,12 +24,12 @@ bool engineAvailable(const std::wstring& home) {
         fileExists(runtime+L"\\bin\\moira-engine.exe");
 }
 static std::wstring q(const std::wstring& s){return L"\""+s+L"\"";}
-bool computeChart(const Input& input,const std::wstring& dir,const std::wstring& home,std::wstring& result,HANDLE cancel){auto check=validate(input);if(!check){result=check.message;return false;}if(!engineAvailable(home)){result=L"内置计算核心或星历资料不完整。";return false;}if(!fileExists(dir+L"\\bin\\moira-engine.exe")){result=L"程序的计算文件不完整，请恢复 runtime 文件夹。";return false;}
+bool computeChart(const Input& input,const std::wstring& dir,const std::wstring& home,std::wstring& result,HANDLE cancel,const std::wstring& calendarMode){if(calendarMode.empty()){auto check=validate(input);if(!check){result=check.message;return false;}}else if(input.v.size()!=10||(calendarMode!=L"--solar"&&calendarMode!=L"--lunar"&&calendarMode!=L"--lunar-leap")){result=L"历法转换请求无效。";return false;}if(!engineAvailable(home)){result=L"内置计算核心或星历资料不完整。";return false;}if(!fileExists(dir+L"\\bin\\moira-engine.exe")){result=L"程序的计算文件不完整，请恢复 runtime 文件夹。";return false;}
  std::string data="moira\n";for(auto& f:input.v){data+=utf8(f);data+='\n';}SECURITY_ATTRIBUTES sa={sizeof(sa),nullptr,TRUE};HANDLE ir=nullptr,iw=nullptr,orr=nullptr,ow=nullptr;
  if(!CreatePipe(&ir,&iw,&sa,0)||!CreatePipe(&orr,&ow,&sa,0)){if(ir)CloseHandle(ir);if(iw)CloseHandle(iw);if(orr)CloseHandle(orr);if(ow)CloseHandle(ow);result=L"无法创建本地计算通道。";return false;}
  SetHandleInformation(iw,HANDLE_FLAG_INHERIT,0);SetHandleInformation(orr,HANDLE_FLAG_INHERIT,0);STARTUPINFOW si={sizeof(si)};si.dwFlags=STARTF_USESTDHANDLES|STARTF_USESHOWWINDOW;si.wShowWindow=SW_HIDE;si.hStdInput=ir;si.hStdOutput=ow;si.hStdError=ow;PROCESS_INFORMATION pi={};
  std::wstring executable=dir+L"\\bin\\moira-engine.exe";
- std::wstring cmd=q(executable)+L" --stdin-path";
+ std::wstring cmd=q(executable)+L" --stdin-path"+(calendarMode.empty()?L"":L" "+calendarMode);
  BOOL ok=CreateProcessW(executable.c_str(),cmd.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW,nullptr,dir.c_str(),&si,&pi);CloseHandle(ir);CloseHandle(ow);if(!ok){CloseHandle(iw);CloseHandle(orr);result=L"无法启动内置计算核心，请检查 runtime 文件夹是否完整。";return false;}DWORD wrote=0;bool writeOK=WriteFile(iw,data.data(),(DWORD)data.size(),&wrote,nullptr)&&wrote==data.size();CloseHandle(iw);
  std::string bytes;char buf[8192];DWORD got=0;bool timeout=false,large=false,cancelled=false;ULONGLONG end=GetTickCount64()+30000;
  for(;;){if(cancel&&WaitForSingleObject(cancel,0)==WAIT_OBJECT_0){cancelled=true;break;}DWORD available=0;if(!PeekNamedPipe(orr,nullptr,0,nullptr,&available,nullptr))break;if(available){DWORD n=(std::min<DWORD>)(available,sizeof(buf));if(!ReadFile(orr,buf,n,&got,nullptr)||!got)break;if(bytes.size()+got>4*1024*1024){large=true;break;}bytes.append(buf,got);continue;}if(WaitForSingleObject(pi.hProcess,0)==WAIT_OBJECT_0)break;if(GetTickCount64()>end){timeout=true;break;}Sleep(15);}
