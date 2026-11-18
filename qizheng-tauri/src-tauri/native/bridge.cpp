@@ -71,7 +71,7 @@ static Json profilesJson() {
 
 static void sendState() {
     notify({
-        {"event", "state"}, {"version", "0.5.5"},
+        {"event", "state"}, {"version", "0.5.6"},
         {"engineReady", engineAvailable(app.engine)},
         {"enginePath", utf8(app.engine)},
         {"engineBundled", true},
@@ -110,6 +110,13 @@ static void beginCalculation(const Input& input, const std::wstring& timeSource,
         const std::wstring modeLine = L"模式: Moira 1.50 默认七政四余\r\n";
         const auto position = text.find(modeLine);
         if (position != std::wstring::npos) text.erase(position, modeLine.size());
+
+        const auto lunarLine = text.find(L"\n阴历: ");
+        if (lunarLine != std::wstring::npos) {
+            const auto lineEnd = text.find(L"\r\n", lunarLine + 1);
+            const auto lunarPillars = text.find(L",  干支: ", lunarLine + 1);
+            if (lunarPillars < lineEnd) text.erase(lunarPillars, lineEnd - lunarPillars);
+        }
     }
     if (succeeded && !timeSource.empty()) {
         const std::wstring previous = L"（请自行确认是否包含夏令时）";

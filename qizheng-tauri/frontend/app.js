@@ -1241,6 +1241,10 @@ async function runInterfaceTest() {
     const lunarChart = await calendarChart;
     assert(lunarChart.fields.slice(2, 5).join("-") === "1982-7-10", "后台未重新换算农历");
     assert(lunarChart.sections[0].includes("输入农历: 1982年5月20日"), "复制文本缺少农历输入来源");
+    assert(lunarChart.sections.every((section) => !/^阴历: .*干支:/m.test(section)), "农历行仍包含重复干支");
+    assert(/^阴历: 壬戌年 五月 二十日 未时 \(昼\)\r?$/m.test(lunarChart.sections[0]), "农历日期或时辰被改动");
+    assert(/^八字: 壬戌年 丁未月 甲午日 辛未时 /m.test(lunarChart.sections[0]), "独立八字内容被改动");
+    checks.lunarPillarsRemoved = true;
     assert(bodyOf(lunarChart.sections[0]) === bodyOf(solarChart.sections[0]), "同一天公历与农历排盘不一致");
     assert(/始于:\s*1992\s+2002/.test(lunarChart.sections[2]) && /11岁\s+21岁/.test(lunarChart.sections[2]), "原有大运年份或年龄被更改");
     checks.lunarSolarChartParity = true;
